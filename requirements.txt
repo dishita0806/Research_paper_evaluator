@@ -1,1 +1,48 @@
+# Research_paper_evaluator
+
+1 System Requirements
+Python 3.10 or higher
+
+Verify using:
+python --version
+
+2️ Python Environment (Recommended)
+Virtual Environment
+
+Supported via:
+python -m venv venv
+
+3️ Required Python Libraries
+The following Python packages are required:
+
+-> FastAPI
+Backend framework for building APIs
+
+-> Uvicorn
+ASGI server to run the FastAPI app
+
+-> python-multipart
+Required for handling file uploads
+
+-> pdfplumber
+Used for extracting text from PDF documents
+
+These can be installed using:
+pip install fastapi uvicorn python-multipart pdfplumber
+
+
+
+4 Required to access:
+
+Swagger UI (/docs)
+Future Streamlit frontend
+
+
+
+5 LLM Integration Requirements
+-> Groq API Key
+Required for LLM-based section analysis and scoring
+
+Should be stored as an environment variable:
+GROQ_API_KEY=your_api_key_here
 
