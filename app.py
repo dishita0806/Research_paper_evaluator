@@ -96,6 +96,59 @@ def call_groq(system_prompt: str, user_prompt: str):
     return response.json()["choices"][0]["message"]["content"]
 
 # -------------------------------------------------
+# Summary generation
+# -------------------------------------------------
+
+def get_section_summary(section_name: str, section_text: str):
+    system_prompt = """
+You are an academic reader summarizing a complete research paper.
+
+Your task is to produce a coherent, high-level summary of the ENTIRE paper,
+not of a specific section.
+
+You must infer the overall research problem, proposed solution, methodology,
+and key outcomes by reading the provided text.
+
+
+WHAT THIS SUMMARY SHOULD DO
+ Explain the research problem being addressed
+ Describe the main idea or approach proposed by the authors
+ Mention the methodology or system at a high level
+ Mention the type of evaluation or results if present
+ Capture the paper as a whole, not its structure
+
+
+WHAT YOU MUST NOT DO
+Do NOT explain what an abstract/introduction/methodology is
+Do NOT describe section purposes
+Do NOT say “this section describes…”
+Do NOT critique or evaluate the paper
+Do NOT mention strengths or weaknesses
+Do NOT assume missing information
+
+
+STYLE & LENGTH
+Neutral, academic tone
+5–7 sentences
+Written as if explaining the paper to another researcher
+
+
+FINAL INSTRUCTION
+Summarize the research paper itself, not the document structure.
+
+"""
+
+    user_prompt = f"""
+Section: {section_name}
+
+Text:
+{section_text[:3000]}
+"""
+
+    return call_groq(system_prompt, user_prompt)
+
+
+# -------------------------------------------------
 # Observation generation
 # -------------------------------------------------
 def get_section_observations(section_name: str, section_text: str):
@@ -103,77 +156,55 @@ def get_section_observations(section_name: str, section_text: str):
 You are an expert academic peer reviewer with experience reviewing papers for
 IEEE, ACM, Springer, and Elsevier venues.
 
-Your task is to FIRST understand and summarize the content of the provided
+Your task is to FIRST understand the content of the provided
 paper section, and THEN extract objective reviewer observations.
 
-You must strictly follow the two-phase process below.
-
-================================================
-PHASE 1 — SECTION SUMMARY (UNDERSTANDING PHASE)
-================================================
-Briefly summarize what this section is about.
-
-The summary should:
-• Capture the purpose of the section
-• Identify what the authors are trying to do or claim
-• Be purely descriptive and neutral
-• Be at most 3–4 sentences
-
-Do NOT evaluate or judge in the summary.
-Do NOT add opinions or criticism.
-
-This phase answers:
-“What is the author saying in this section?”
-
-================================================
-PHASE 2 — REVIEWER OBSERVATIONS (EVALUATION PHASE)
-================================================
-After summarizing, extract factual reviewer observations.
+REVIEWER OBSERVATIONS (EVALUATION PHASE)
+Extract factual reviewer observations.
 
 Your observations must:
-• Be grounded strictly in the provided text
-• Identify what is clearly present
-• Identify what is missing, unclear, or under-specified
-• Identify weaknesses only when supported by text
-• Identify strengths only when explicitly justified
+Be grounded strictly in the provided text
+Identify what is clearly present
+Identify what is missing, unclear, or under-specified
+Identify weaknesses only when supported by text
+Identify strengths only when explicitly justified
 
 You are NOT scoring.
 You are NOT giving suggestions.
 You are NOT rewriting the paper.
 
-================================================
-STRICT RULES
-================================================
-• Do NOT hallucinate experiments, datasets, metrics, or comparisons
-• Do NOT assume standard practices unless stated
-• Do NOT invent citations or baselines
-• Do NOT provide advice or fixes
-• If information is missing, explicitly state that it is missing
 
-================================================
-OUTPUT FORMAT (STRICT)
-================================================
+STRICT RULES
+
+Do NOT hallucinate experiments, datasets, metrics, or comparisons
+Do NOT assume standard practices unless stated
+Do NOT invent citations or baselines
+Do NOT provide advice or fixes
+If information is missing, explicitly state that it is missing
+Observations should NOT be same as justifications for scores.
+
+
+OUTPUT FORMAT
+
 Return your response in the following format:
 
-SUMMARY:
-<3–4 sentence neutral summary>
 
 OBSERVATIONS:
-- Bullet point observation 1
-- Bullet point observation 2
-- Bullet point observation 3
+Bullet point observation 1
+Bullet point observation 2
+Bullet point observation 3
 (3–6 observations total)
 
-================================================
+
 STYLE & TONE
-================================================
-• Professional, neutral, analytical
-• Sound like a real academic reviewer
-• Avoid emotional or judgmental language
-• Avoid speculation
+
+Professional, neutral, analytical
+Sound like a real academic reviewer
+Avoid emotional or judgmental language
+Avoid speculation
 
 You are acting as a reviewer, not an editor, mentor, or co-author.
-
+DON NOT  include a summary.
 """
 
     user_prompt = f"""
@@ -196,51 +227,71 @@ previously identified reviewer observations.
 You must follow the scoring rubric exactly.
 You must justify every score using the observations.
 
---------------------------------
+
 SCORING CRITERIA (0–10)
---------------------------------
+
 Novelty:
-- 0–3: No clear novelty
-- 4–6: Incremental or weak novelty
-- 7–8: Clear and meaningful novelty
-- 9–10: Strong, well-justified novelty
+ 0–3: No clear novelty
+ 4–6: Incremental or weak novelty
+ 7–8: Clear and meaningful novelty
+ 9–10: Strong, well-justified novelty
+
+Originality:
+ 0–3: Derivative, obvious, or reused ideas
+ 4–6: Somewhat original but builds on existing work
+ 7–8: Clearly original ideas or approaches
+ 9–10: Highly original, novel contributions
 
 Technical Quality:
-- Correctness, rigor, and soundness of approach
+ 0–3: Major correctness issues or flawed technical reasoning
+ 4–6: Generally correct but lacks rigor or has technical gaps
+ 7–8: Technically sound with good rigor and consistency
+ 9–10: Highly rigorous, well-justified, and technically
 
 Methodology:
-- Completeness, clarity, and reproducibility
+ 0–3: Incomplete or unclear methodology; not reproducible
+ 4–6: Method described but lacks sufficient detail or clarity
+ 7–8: Clear and mostly reproducible methodology
+ 9–10: Very clear, detailed, and fully reproducible methodology
 
 Experimental Validation:
-- Quality of experiments, datasets, baselines, metrics
+ 0–3: Little to no experimental evaluation
+ 4–6: Limited experiments or weak evaluation setup
+ 7–8: Solid experimental design with relevant baselines
+ 9–10: Extensive, well-designed, and convincing evaluation
 
 Clarity:
-- Organization, readability, and presentation
+ 0–3: Poorly written or disorganized
+ 4–6: Understandable but unclear in places
+ 7–8: Well-organized and clearly written
+ 9–10: Exceptionally clear, polished, and easy to follow
 
---------------------------------
+
 RULES
---------------------------------
-• Scores must be integers
-• Scores must be conservative
-• Missing information must reduce scores
-• Do NOT infer or assume missing details
-• Do NOT change or reinterpret observations
 
---------------------------------
+Scores must be integers
+Scores must be conservative
+Missing information must reduce scores
+Do NOT infer or assume missing details
+Do NOT change or reinterpret observations
+
+
 OUTPUT FORMAT (STRICT JSON)
---------------------------------
+
 {
-  "novelty": <int>,
-  "technical_quality": <int>,
-  "methodology": <int>,
-  "experimental_validation": <int>,
-  "clarity": <int>,
+  "Novelty": <int>,
+  "Originality": <int>,
+  "Technical_quality": <int>,
+  "Methodology": <int>,
+  "Experimental_validation": <int>,
+  "Clarity": <int>,
   "justification": {
-    "novelty": "...",
-    "technical_quality": "...",
-    "methodology": "...",
-    "experimental_validation": "...",
-    "clarity": "..."
+    "Novelty": "...",
+    "Originality": "...",
+    "Technical_quality": "...",
+    "Methodology": "...",
+    "Experimental_validation": "...",
+    "Clarity": "..."
   }
 }
 """
@@ -261,55 +312,62 @@ after completing a formal review and scoring of a research paper.
 Your task is to generate clear, actionable suggestions for improving the paper,
 based strictly on reviewer observations and assigned scores.
 
-================================================
+
 INPUT CONTEXT
-================================================
+
 You are given:
-• Section-wise reviewer observations
-• Numeric rubric scores with justifications
-• Overall average score
-• Final reviewer decision
+Section-wise reviewer observations
+Numeric rubric scores with justifications
+Overall average score
+Final reviewer decision
 
-================================================
+
 WHAT YOU SHOULD DO
-================================================
-• Identify weaknesses implied by low or moderate scores
-• Suggest improvements that directly address those weaknesses
-• Suggest missing experiments, evaluations, or comparisons if relevant
-• Suggest clarity or structural improvements where appropriate
-• Align all suggestions with the review outcome
 
-================================================
+Identify weaknesses implied by low or moderate scores
+Suggest improvements that directly address those weaknesses
+Suggest missing experiments, evaluations, or comparisons if relevant
+Suggest clarity or structural improvements where appropriate
+Align all suggestions with the review outcome
+
+
+
+
+
 WHAT YOU MUST NOT DO
-================================================
-• Do NOT invent new weaknesses not supported by observations
-• Do NOT contradict the given scores or decision
-• Do NOT restate observations verbatim
-• Do NOT rewrite the paper
-• Do NOT suggest future research directions unrelated to the review
-• Do NOT be vague or generic
 
-================================================
+Do NOT invent new weaknesses not supported by observations
+Do NOT contradict the given scores or decision
+Do NOT restate observations verbatim
+Do NOT rewrite the paper
+Do NOT suggest future research directions unrelated to the review
+Do NOT be vague or generic
+The justifications for scores are NOT observations.
+
+
+
+
+
 STYLE & TONE
-================================================
-• Professional and constructive
-• Reviewer-to-author tone
-• Specific and actionable
-• Neutral and respectful
 
-================================================
+Professional and constructive
+Reviewer-to-author tone
+Specific and actionable
+Neutral and respectful
+
+
 OUTPUT FORMAT (STRICT)
-================================================
+
 Return 4–8 bullet-point suggestions.
 
 Each suggestion must:
-• Be directly actionable
-• Be 1–2 sentences long
-• Clearly correspond to an identified weakness
+Be directly actionable
+Be 1–2 sentences long
+Clearly correspond to an identified weakness
 
-================================================
+
 FINAL INSTRUCTION
-================================================
+
 The goal is to help the authors improve the quality, clarity,
 and rigor of the paper without altering its core idea.
 """
@@ -334,6 +392,7 @@ Reviewer observations:
 @app.post("/review-paper")
 async def review_paper(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
+    print(pdf_bytes)
 
     extracted_text = ""
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -342,20 +401,24 @@ async def review_paper(file: UploadFile = File(...)):
 
     sections = split_into_sections(extracted_text)
 
+    paper_summary = get_section_summary("Full Paper", extracted_text)
+    print(extracted_text)
     observations = {}
+
     for section, content in sections.items():
         if content.strip():
-            observations[section] = get_section_observations(section, content)
+                observations[section] = get_section_observations(section, content)
 
     scores = score_paper(observations)
 
     avg_score = sum([
-        scores["novelty"],
-        scores["technical_quality"],
-        scores["methodology"],
-        scores["experimental_validation"],
-        scores["clarity"]
-    ]) / 5
+        scores["Novelty"],
+        scores["Originality"],
+        scores["Technical_quality"],
+        scores["Methodology"],
+        scores["Experimental_validation"],
+        scores["Clarity"]
+    ]) / 6
 
     if avg_score >= 8:
         decision = "Accept"
@@ -370,6 +433,8 @@ async def review_paper(file: UploadFile = File(...)):
 
     return {
         "filename": file.filename,
+        "summaries": paper_summary,
+        "observations": observations,
         "scores": scores,
         "average_score": round(avg_score, 2),
         "decision": decision,
